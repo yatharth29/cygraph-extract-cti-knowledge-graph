@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { fastapiClient } from "@/lib/services/fastapi-client";
 
 // Dynamic import to avoid SSR issues with D3
 const D3GraphVisualization = dynamic(
@@ -29,15 +30,15 @@ export default function GraphPage() {
 
   const fetchGraphData = async () => {
     try {
-      const response = await fetch("/api/graph");
-      const data = await response.json();
-      setGraphData(data);
+      // Use the deployed FastAPI backend
+      const response = await fastapiClient.queryGraph({});
+      setGraphData(response.data);
       
       // Calculate stats
-      const uniqueTypes = new Set(data.nodes?.map((n: any) => n.type));
+      const uniqueTypes = new Set(response.data.nodes?.map((n: any) => n.type));
       setStats({
-        nodes: data.nodes?.length || 0,
-        edges: data.edges?.length || 0,
+        nodes: response.data.nodes?.length || 0,
+        edges: response.data.edges?.length || 0,
         entityTypes: uniqueTypes.size,
       });
     } catch (error) {

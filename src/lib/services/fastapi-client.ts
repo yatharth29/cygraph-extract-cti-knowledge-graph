@@ -67,8 +67,8 @@ class FastAPIClient {
   private baseURL: string;
 
   constructor() {
-    // In production, use environment variable
-    this.baseURL = process.env.NEXT_PUBLIC_FASTAPI_URL || "http://localhost:8000";
+    // Use deployed backend URL or environment variable
+    this.baseURL = process.env.NEXT_PUBLIC_FASTAPI_URL || "https://cygraph-extract-cti-knowledge-graph.onrender.com";
   }
 
   /**

@@ -10,6 +10,7 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, ArrowLeft } from "
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { fastapiClient } from "@/lib/services/fastapi-client";
 
 export default function UploadPage() {
   const [text, setText] = useState("");
@@ -49,24 +50,13 @@ export default function UploadPage() {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 500);
 
-      // Call FastAPI backend
-      const response = await fetch("/api/process-cti", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      });
+      // Call deployed FastAPI backend
+      const response = await fastapiClient.processCTI({ text });
 
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (!response.ok) {
-        throw new Error("Failed to process CTI text");
-      }
-
-      const data = await response.json();
-      setResult(data);
+      setResult(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
