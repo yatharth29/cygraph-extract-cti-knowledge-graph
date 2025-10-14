@@ -10,60 +10,72 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, ArrowLeft } from "
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { fastapiClient } from "@/lib/services/fastapi-client";
 import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
-  const router = useRouter();
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<any>(null);
+  const router = useRouter();
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      // Read file content
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setText(event.target?.result as string);
-      };
-      reader.readAsText(selectedFile);
-    }
+    if (!selectedFile) return;
+
+    setFile(selectedFile);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setText(content);
+    };
+    reader.readAsText(selectedFile);
   };
 
-  const handleSubmit = async () => {
+  const handleProcess = async () => {
     if (!text.trim()) {
-      setError("Please provide CTI text to process");
+      setError("Please enter CTI text to process");
       return;
     }
 
     setIsProcessing(true);
     setError(null);
-    setResult(null);
+    setResults(null);
     setProgress(0);
 
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => Math.min(prev + 10, 90));
+    }, 200);
+
     try {
-      // Simulate processing with progress updates
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 10, 90));
-      }, 500);
+      // Use local Next.js API route instead of FastAPI backend
+      const response = await fetch("/api/process-cti", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
 
-      // Call deployed FastAPI backend
-      const response = await fastapiClient.processCTI({ text });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
+      const data = await response.json();
+      
       clearInterval(progressInterval);
       setProgress(100);
-
-      setResult(response);
       
       // Store results in localStorage for results page
-      localStorage.setItem("cti_results", JSON.stringify(response));
+      localStorage.setItem("cti-results", JSON.stringify(data));
+      
+      setResults(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      clearInterval(progressInterval);
+      setError(err instanceof Error ? err.message : "Failed to process CTI text");
     } finally {
       setIsProcessing(false);
     }
@@ -171,12 +183,12 @@ export default function UploadPage() {
                   )}
 
                   {/* Success Alert */}
-                  {result && (
+                  {results && (
                     <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <AlertDescription className="text-green-600 dark:text-green-400">
-                        Successfully processed! Extracted {result.entities?.length || 0} entities and{" "}
-                        {result.relations?.length || 0} relations.
+                        Successfully processed! Extracted {results.entities?.length || 0} entities and{" "}
+                        {results.relations?.length || 0} relations.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -185,7 +197,7 @@ export default function UploadPage() {
                   <Button
                     className="w-full"
                     size="lg"
-                    onClick={handleSubmit}
+                    onClick={handleProcess}
                     disabled={isProcessing || !text.trim()}
                   >
                     {isProcessing ? (
@@ -201,7 +213,7 @@ export default function UploadPage() {
                     )}
                   </Button>
 
-                  {result && (
+                  {results && (
                     <div className="flex gap-2">
                       <Button variant="outline" className="flex-1" onClick={handleViewResults}>
                         View Results
