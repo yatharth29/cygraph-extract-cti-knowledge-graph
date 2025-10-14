@@ -11,8 +11,10 @@ import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { fastapiClient } from "@/lib/services/fastapi-client";
+import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
+  const router = useRouter();
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -57,11 +59,22 @@ export default function UploadPage() {
       setProgress(100);
 
       setResult(response);
+      
+      // Store results in localStorage for results page
+      localStorage.setItem("cti_results", JSON.stringify(response));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleViewResults = () => {
+    router.push("/results");
+  };
+
+  const handleViewGraph = () => {
+    router.push("/graph");
   };
 
   return (
@@ -190,16 +203,12 @@ export default function UploadPage() {
 
                   {result && (
                     <div className="flex gap-2">
-                      <Link href="/results" className="flex-1">
-                        <Button variant="outline" className="w-full">
-                          View Results
-                        </Button>
-                      </Link>
-                      <Link href="/graph" className="flex-1">
-                        <Button variant="outline" className="w-full">
-                          View Graph
-                        </Button>
-                      </Link>
+                      <Button variant="outline" className="flex-1" onClick={handleViewResults}>
+                        View Results
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={handleViewGraph}>
+                        View Graph
+                      </Button>
                     </div>
                   )}
                 </CardContent>

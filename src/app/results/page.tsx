@@ -1,57 +1,80 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Eye, Filter } from "lucide-react";
+import { ArrowLeft, Download, Eye, Filter, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-// Mock extraction results
-const mockResults = {
-  entities: [
-    { id: 1, text: "APT28", type: "threat-actor", confidence: 0.98, context: "APT28, also known as Fancy Bear..." },
-    { id: 2, text: "Fancy Bear", type: "alias", confidence: 0.95, context: "also known as Fancy Bear, has been..." },
-    { id: 3, text: "Zebrocy", type: "malware", confidence: 0.97, context: "deploying the Zebrocy malware family..." },
-    { id: 4, text: "Government", type: "target-sector", confidence: 0.92, context: "target government and military organizations..." },
-    { id: 5, text: "Eastern Europe", type: "location", confidence: 0.94, context: "organizations across Eastern Europe..." },
-    { id: 6, text: "HTTP", type: "protocol", confidence: 0.99, context: "The malware uses HTTP for C2 communication..." },
-    { id: 7, text: "CVE-2017-0199", type: "vulnerability", confidence: 0.99, context: "exploiting CVE-2017-0199..." },
-    { id: 8, text: "Spear-phishing", type: "technique", confidence: 0.96, context: "leveraged spear-phishing emails..." },
-  ],
-  relations: [
-    { id: 1, source: "APT28", relation: "uses", target: "Zebrocy", confidence: 0.96 },
-    { id: 2, source: "APT28", relation: "aka", target: "Fancy Bear", confidence: 0.98 },
-    { id: 3, source: "APT28", relation: "targets", target: "Government", confidence: 0.93 },
-    { id: 4, source: "Zebrocy", relation: "communicates_via", target: "HTTP", confidence: 0.95 },
-    { id: 5, source: "Zebrocy", relation: "exploits", target: "CVE-2017-0199", confidence: 0.97 },
-    { id: 6, source: "APT28", relation: "leverages", target: "Spear-phishing", confidence: 0.94 },
-    { id: 7, source: "Government", relation: "located_in", target: "Eastern Europe", confidence: 0.91 },
-  ],
-  attributes: [
-    { entity: "Zebrocy", attribute: "malware_family", value: "Trojan", confidence: 0.89 },
-    { entity: "APT28", attribute: "origin", value: "Russia", confidence: 0.87 },
-    { entity: "CVE-2017-0199", attribute: "severity", value: "Critical", confidence: 0.95 },
-    { entity: "Zebrocy", attribute: "c2_protocol", value: "HTTP", confidence: 0.93 },
-  ],
-};
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ResultsPage() {
   const [entityFilter, setEntityFilter] = useState("all");
   const [relationFilter, setRelationFilter] = useState("all");
+  const [results, setResults] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Load results from localStorage (saved by upload page)
+    const savedResults = localStorage.getItem("cti_results");
+    if (savedResults) {
+      try {
+        const parsedResults = JSON.parse(savedResults);
+        setResults(parsedResults);
+      } catch (error) {
+        console.error("Error parsing results:", error);
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Loading results...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!results || !results.entities) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <div className="container mx-auto px-4 py-8">
+          <Link href="/">
+            <Button variant="ghost" className="mb-6">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </Link>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No extraction results found. Please upload and process CTI text first.
+            </AlertDescription>
+          </Alert>
+          <Link href="/upload" className="mt-4 inline-block">
+            <Button>Upload CTI Text</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const filteredEntities =
     entityFilter === "all"
-      ? mockResults.entities
-      : mockResults.entities.filter((e) => e.type === entityFilter);
+      ? results.entities
+      : results.entities.filter((e: any) => e.type === entityFilter);
 
   const filteredRelations =
     relationFilter === "all"
-      ? mockResults.relations
-      : mockResults.relations.filter((r) => r.relation === relationFilter);
+      ? results.relations
+      : results.relations.filter((r: any) => r.relation === relationFilter);
 
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.95) return <Badge className="bg-green-500">High</Badge>;
@@ -73,6 +96,9 @@ export default function ResultsPage() {
     return colors[type] || "bg-gray-500";
   };
 
+  const avgConfidence =
+    results.entities.reduce((sum: number, e: any) => sum + e.confidence, 0) / results.entities.length;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="container mx-auto px-4 py-8">
@@ -92,7 +118,15 @@ export default function ResultsPage() {
               Detailed view of extracted entities, relations, and attributes
             </p>
           </div>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => {
+            const dataStr = JSON.stringify(results, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "cti-extraction-results.json";
+            link.click();
+          }}>
             <Download className="h-4 w-4 mr-2" />
             Export JSON
           </Button>
@@ -103,7 +137,7 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                {mockResults.entities.length}
+                {results.entities.length}
               </div>
               <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Entities Extracted</div>
             </CardContent>
@@ -111,7 +145,7 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                {mockResults.relations.length}
+                {results.relations.length}
               </div>
               <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Relations Mapped</div>
             </CardContent>
@@ -119,14 +153,16 @@ export default function ResultsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {mockResults.attributes.length}
+                {results.metadata?.processing_time?.toFixed(2) || "N/A"}s
               </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Attributes Found</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Processing Time</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400">96.2%</div>
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                {(avgConfidence * 100).toFixed(1)}%
+              </div>
               <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Avg. Confidence</div>
             </CardContent>
           </Card>
@@ -136,14 +172,13 @@ export default function ResultsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Extraction Details</CardTitle>
-            <CardDescription>Browse extracted entities, relations, and attributes</CardDescription>
+            <CardDescription>Browse extracted entities and relations</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="entities" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="entities">Entities</TabsTrigger>
                 <TabsTrigger value="relations">Relations</TabsTrigger>
-                <TabsTrigger value="attributes">Attributes</TabsTrigger>
               </TabsList>
 
               {/* Entities Tab */}
@@ -159,12 +194,9 @@ export default function ResultsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="threat-actor">Threat Actors</SelectItem>
-                      <SelectItem value="malware">Malware</SelectItem>
-                      <SelectItem value="vulnerability">Vulnerabilities</SelectItem>
-                      <SelectItem value="technique">Techniques</SelectItem>
-                      <SelectItem value="target-sector">Target Sectors</SelectItem>
-                      <SelectItem value="location">Locations</SelectItem>
+                      {Array.from(new Set(results.entities.map((e: any) => e.type))).map((type: any) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -176,13 +208,11 @@ export default function ResultsPage() {
                         <TableHead>Entity</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Confidence</TableHead>
-                        <TableHead>Context</TableHead>
-                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredEntities.map((entity) => (
-                        <TableRow key={entity.id}>
+                      {filteredEntities.map((entity: any, idx: number) => (
+                        <TableRow key={idx}>
                           <TableCell className="font-medium">{entity.text}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={`${getTypeColor(entity.type)} text-white`}>
@@ -194,14 +224,6 @@ export default function ResultsPage() {
                               {getConfidenceBadge(entity.confidence)}
                               <span className="text-sm text-slate-600">{(entity.confidence * 100).toFixed(1)}%</span>
                             </div>
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate text-sm text-slate-600">
-                            {entity.context}
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -223,10 +245,9 @@ export default function ResultsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Relations</SelectItem>
-                      <SelectItem value="uses">Uses</SelectItem>
-                      <SelectItem value="targets">Targets</SelectItem>
-                      <SelectItem value="exploits">Exploits</SelectItem>
-                      <SelectItem value="communicates_via">Communicates Via</SelectItem>
+                      {Array.from(new Set(results.relations.map((r: any) => r.relation))).map((rel: any) => (
+                        <SelectItem key={rel} value={rel}>{rel}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -242,8 +263,8 @@ export default function ResultsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredRelations.map((relation) => (
-                        <TableRow key={relation.id}>
+                      {filteredRelations.map((relation: any, idx: number) => (
+                        <TableRow key={idx}>
                           <TableCell className="font-medium">{relation.source}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{relation.relation}</Badge>
@@ -255,39 +276,6 @@ export default function ResultsPage() {
                               <span className="text-sm text-slate-600">
                                 {(relation.confidence * 100).toFixed(1)}%
                               </span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </TabsContent>
-
-              {/* Attributes Tab */}
-              <TabsContent value="attributes" className="space-y-4">
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Entity</TableHead>
-                        <TableHead>Attribute</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead>Confidence</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockResults.attributes.map((attr, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">{attr.entity}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{attr.attribute}</Badge>
-                          </TableCell>
-                          <TableCell>{attr.value}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {getConfidenceBadge(attr.confidence)}
-                              <span className="text-sm text-slate-600">{(attr.confidence * 100).toFixed(1)}%</span>
                             </div>
                           </TableCell>
                         </TableRow>

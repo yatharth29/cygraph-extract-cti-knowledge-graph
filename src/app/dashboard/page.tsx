@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, TrendingUp, Activity, Database, Zap, AlertCircle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { fastapiClient } from "@/lib/services/fastapi-client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Mock metrics data
 const processingMetrics = [
@@ -39,12 +41,25 @@ const systemHealth = [
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [healthData, setHealthData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    fetchHealthMetrics();
   }, []);
+
+  const fetchHealthMetrics = async () => {
+    setIsLoading(true);
+    try {
+      const data = await fastapiClient.getHealthMetrics();
+      setHealthData(data);
+    } catch (err) {
+      console.error("Failed to fetch health metrics:", err);
+      setError("Using demo data - backend health endpoint not available");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -64,6 +79,13 @@ export default function DashboardPage() {
             Real-time monitoring and analytics for CyGraph-Extract
           </p>
         </div>
+
+        {error && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Key Metrics */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

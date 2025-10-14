@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import FeedbackForm from "@/components/FeedbackForm";
 import { Badge } from "@/components/ui/badge";
+import { fastapiClient } from "@/lib/services/fastapi-client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 export default function FeedbackPage() {
   const [invalidTriples, setInvalidTriples] = useState<any[]>([]);
@@ -20,7 +23,7 @@ export default function FeedbackPage() {
   const fetchInvalidTriples = async () => {
     setLoading(true);
     try {
-      // Mock data - in production, this would fetch from your backend
+      // Mock data - backend endpoint for fetching invalid triples not yet implemented
       const mockTriples = [
         {
           id: 1,
@@ -48,15 +51,29 @@ export default function FeedbackPage() {
   };
 
   const handleFeedbackSubmit = async (feedback: any) => {
-    // In production, send to backend API
-    console.log("Feedback submitted:", feedback);
-    
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    // Remove the triple from the list after successful feedback
-    setInvalidTriples((prev) => prev.filter((t) => t.id !== selectedTriple.id));
-    setSelectedTriple(null);
+    try {
+      // Submit to FastAPI backend
+      await fastapiClient.submitFeedback({
+        extraction_id: selectedTriple.id,
+        corrections: [
+          {
+            entity_id: selectedTriple.id.toString(),
+            correct_type: feedback.correctedType,
+            correct_text: feedback.correctedText,
+            should_delete: feedback.shouldDelete,
+          },
+        ],
+      });
+
+      toast.success("Feedback submitted successfully!");
+      
+      // Remove the triple from the list after successful feedback
+      setInvalidTriples((prev) => prev.filter((t) => t.id !== selectedTriple.id));
+      setSelectedTriple(null);
+    } catch (error) {
+      console.error("Failed to submit feedback:", error);
+      toast.error("Failed to submit feedback. Please try again.");
+    }
   };
 
   return (
@@ -84,6 +101,13 @@ export default function FeedbackPage() {
               Review and provide feedback on invalid triples to improve the extraction pipeline
             </p>
           </div>
+
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Using demo data - backend endpoint for fetching invalid triples not yet implemented
+            </AlertDescription>
+          </Alert>
 
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Invalid Triples List */}
