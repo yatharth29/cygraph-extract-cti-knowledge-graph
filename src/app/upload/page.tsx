@@ -11,27 +11,106 @@ import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useRouter } from "next/navigation";
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
+
+// Configure PDF.js worker
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
 
 export default function UploadPage() {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<any>(null);
   const router = useRouter();
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+      fullText += pageText + "\n";
+    }
+
+    return fullText.trim();
+  };
+
+  const extractTextFromDOCX = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  };
+
+  const extractTextFromCSV = async (file: File): Promise<string> => {
+    return await file.text();
+  };
+
+  const extractTextFromJSON = async (file: File): Promise<string> => {
+    const text = await file.text();
+    try {
+      const json = JSON.parse(text);
+      return JSON.stringify(json, null, 2);
+    } catch {
+      return text;
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
     setFile(selectedFile);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setText(content);
-    };
-    reader.readAsText(selectedFile);
+    setIsExtracting(true);
+    setError(null);
+
+    try {
+      const fileExtension = selectedFile.name.split(".").pop()?.toLowerCase();
+      let extractedText = "";
+
+      switch (fileExtension) {
+        case "pdf":
+          extractedText = await extractTextFromPDF(selectedFile);
+          break;
+        case "docx":
+        case "doc":
+          extractedText = await extractTextFromDOCX(selectedFile);
+          break;
+        case "csv":
+          extractedText = await extractTextFromCSV(selectedFile);
+          break;
+        case "json":
+          extractedText = await extractTextFromJSON(selectedFile);
+          break;
+        case "txt":
+        case "text":
+        default:
+          extractedText = await selectedFile.text();
+          break;
+      }
+
+      setText(extractedText);
+      setError(null);
+    } catch (err) {
+      setError(
+        `Failed to extract text from ${selectedFile.name}: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+      setText("");
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const handleProcess = async () => {
@@ -116,7 +195,7 @@ export default function UploadPage() {
                 <CardHeader>
                   <CardTitle>CTI Text Input</CardTitle>
                   <CardDescription>
-                    Paste CTI text directly or upload a text file
+                    Paste CTI text directly or upload a file (PDF, DOCX, TXT, CSV, JSON)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -129,20 +208,32 @@ export default function UploadPage() {
                         className="flex items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer hover:border-indigo-400 transition-colors"
                       >
                         <div className="text-center">
-                          <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            {file ? file.name : "Click to upload or drag and drop"}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
-                            TXT, PDF, or DOC files
-                          </p>
+                          {isExtracting ? (
+                            <>
+                              <Loader2 className="h-8 w-8 text-indigo-500 mx-auto mb-2 animate-spin" />
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Extracting text from {file?.name}...
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                {file ? file.name : "Click to upload or drag and drop"}
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                                PDF, DOCX, TXT, CSV, or JSON files
+                              </p>
+                            </>
+                          )}
                         </div>
                         <input
                           id="file-upload"
                           type="file"
                           className="hidden"
-                          accept=".txt,.pdf,.doc,.docx"
+                          accept=".txt,.pdf,.doc,.docx,.csv,.json"
                           onChange={handleFileUpload}
+                          disabled={isExtracting}
                         />
                       </label>
                     </div>
@@ -157,6 +248,7 @@ export default function UploadPage() {
                       className="mt-2 min-h-[300px] font-mono text-sm"
                       value={text}
                       onChange={(e) => setText(e.target.value)}
+                      disabled={isExtracting}
                     />
                     <p className="text-xs text-slate-500 mt-2">
                       {text.length} characters | {text.split(/\s+/).filter(Boolean).length} words
@@ -198,7 +290,7 @@ export default function UploadPage() {
                     className="w-full"
                     size="lg"
                     onClick={handleProcess}
-                    disabled={isProcessing || !text.trim()}
+                    disabled={isProcessing || isExtracting || !text.trim()}
                   >
                     {isProcessing ? (
                       <>
@@ -229,6 +321,44 @@ export default function UploadPage() {
 
             {/* Info Sidebar */}
             <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Supported Formats</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">PDF</Badge>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Portable Document Format
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">DOCX</Badge>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Microsoft Word Document
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">TXT</Badge>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Plain Text File
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">CSV</Badge>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Comma-Separated Values
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">JSON</Badge>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      JavaScript Object Notation
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Processing Pipeline</CardTitle>
