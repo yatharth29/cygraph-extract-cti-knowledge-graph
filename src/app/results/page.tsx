@@ -19,7 +19,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     // Load results from localStorage (saved by upload page)
-    const savedResults = localStorage.getItem("cti_results");
+    const savedResults = localStorage.getItem("cti-results");
     if (savedResults) {
       try {
         const parsedResults = JSON.parse(savedResults);
@@ -30,6 +30,12 @@ export default function ResultsPage() {
     }
     setLoading(false);
   }, []);
+
+  // Helper function to get entity name by ID
+  const getEntityName = (entityId: string) => {
+    const entity = results?.entities?.find((e: any) => e.id === entityId);
+    return entity ? entity.text : entityId;
+  };
 
   if (loading) {
     return (
@@ -265,11 +271,11 @@ export default function ResultsPage() {
                     <TableBody>
                       {filteredRelations.map((relation: any, idx: number) => (
                         <TableRow key={idx}>
-                          <TableCell className="font-medium">{relation.source}</TableCell>
+                          <TableCell className="font-medium">{getEntityName(relation.source)}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{relation.relation}</Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{relation.target}</TableCell>
+                          <TableCell className="font-medium">{getEntityName(relation.target)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getConfidenceBadge(relation.confidence)}

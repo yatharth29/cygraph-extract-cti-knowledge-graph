@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { fastapiClient } from "@/lib/services/fastapi-client";
 
 // Dynamic import to avoid SSR issues with D3
 const D3GraphVisualization = dynamic(
@@ -30,17 +29,38 @@ export default function GraphPage() {
 
   const fetchGraphData = async () => {
     try {
-      // Use the deployed FastAPI backend
-      const response = await fastapiClient.queryGraph({});
-      setGraphData(response.data);
+      // First try to get graph data from localStorage (uploaded data)
+      const savedResults = localStorage.getItem("cti-results");
+      if (savedResults) {
+        const parsedResults = JSON.parse(savedResults);
+        if (parsedResults.graph) {
+          setGraphData(parsedResults.graph);
+          const uniqueTypes = new Set(parsedResults.graph.nodes?.map((n: any) => n.type));
+          setStats({
+            nodes: parsedResults.graph.nodes?.length || 0,
+            edges: parsedResults.graph.edges?.length || 0,
+            entityTypes: uniqueTypes.size,
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback to API endpoint
+      const response = await fetch("/api/graph");
+      const result = await response.json();
       
-      // Calculate stats
-      const uniqueTypes = new Set(response.data.nodes?.map((n: any) => n.type));
-      setStats({
-        nodes: response.data.nodes?.length || 0,
-        edges: response.data.edges?.length || 0,
-        entityTypes: uniqueTypes.size,
-      });
+      if (result.success && result.data) {
+        setGraphData(result.data);
+        
+        // Calculate stats
+        const uniqueTypes = new Set(result.data.nodes?.map((n: any) => n.type));
+        setStats({
+          nodes: result.data.nodes?.length || 0,
+          edges: result.data.edges?.length || 0,
+          entityTypes: uniqueTypes.size,
+        });
+      }
     } catch (error) {
       console.error("Failed to fetch graph data:", error);
     } finally {
@@ -132,7 +152,10 @@ export default function GraphPage() {
             <div className="w-full h-[600px] bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-slate-500">Loading graph visualization...</p>
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <p className="text-slate-500">Loading graph visualization...</p>
+                  </div>
                 </div>
               ) : graphData?.nodes && graphData?.edges ? (
                 <D3GraphVisualization 
@@ -142,8 +165,11 @@ export default function GraphPage() {
                   height={600}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-slate-500">No graph data available</p>
+                <div className="flex flex-col items-center justify-center h-full">
+                  <p className="text-slate-500 mb-4">No graph data available</p>
+                  <Link href="/upload">
+                    <Button>Process CTI Text First</Button>
+                  </Link>
                 </div>
               )}
             </div>
