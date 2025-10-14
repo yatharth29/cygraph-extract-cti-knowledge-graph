@@ -14,9 +14,15 @@ import { useRouter } from "next/navigation";
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
 
-// Configure PDF.js worker - use unpkg as reliable CDN
+// Configure PDF.js worker with multiple fallback strategies
 if (typeof window !== "undefined") {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+  // Try jsdelivr with .mjs extension (better for ESM)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.mjs`;
+  
+  // Alternative: If the above fails, you can also try:
+  // pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.mjs`;
+  // or for legacy:
+  // pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 }
 
 export default function UploadPage() {
