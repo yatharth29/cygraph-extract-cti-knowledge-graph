@@ -4,19 +4,22 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, Settings } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
 
-// Dynamic import to avoid SSR issues with D3
-const D3GraphVisualization = dynamic(
-  () => import("@/components/D3GraphVisualization"),
+// Dynamic import to avoid SSR issues
+const ForceGraphVisualization = dynamic(
+  () => import("@/components/ForceGraphVisualization"),
   { ssr: false }
 );
 
 export default function GraphPage() {
   const [graphData, setGraphData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [source, setSource] = useState<"localStorage" | "neo4j">("localStorage");
   const [stats, setStats] = useState({
     nodes: 0,
     edges: 0,
@@ -27,45 +30,77 @@ export default function GraphPage() {
     fetchGraphData();
   }, []);
 
-  const fetchGraphData = async () => {
+  const fetchGraphData = async (forceNeo4j = false) => {
+    setLoading(true);
     try {
-      // First try to get graph data from localStorage (uploaded data)
-      const savedResults = localStorage.getItem("cti-results");
-      if (savedResults) {
-        const parsedResults = JSON.parse(savedResults);
-        if (parsedResults.graph) {
-          setGraphData(parsedResults.graph);
-          const uniqueTypes = new Set(parsedResults.graph.nodes?.map((n: any) => n.type));
-          setStats({
-            nodes: parsedResults.graph.nodes?.length || 0,
-            edges: parsedResults.graph.edges?.length || 0,
-            entityTypes: uniqueTypes.size,
-          });
+      // First try Neo4j if configured and requested
+      const savedConfig = localStorage.getItem("cygraph-config");
+      const config = savedConfig ? JSON.parse(savedConfig) : {};
+
+      if (forceNeo4j && config.neo4jUri) {
+        const response = await fetch("/api/neo4j/query", {
+          method: "GET",
+          headers: {
+            "x-neo4j-config": JSON.stringify({
+              uri: config.neo4jUri,
+              username: config.neo4jUsername,
+              password: config.neo4jPassword,
+            }),
+          },
+        });
+
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          setGraphData(result.data);
+          setSource("neo4j");
+          calculateStats(result.data);
+          toast.success("Loaded graph from Neo4j");
           setLoading(false);
           return;
         }
       }
 
-      // Fallback to API endpoint
-      const response = await fetch("/api/graph");
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        setGraphData(result.data);
+      // Fallback to localStorage
+      const savedResults = localStorage.getItem("cti-results");
+      if (savedResults) {
+        const parsedResults = JSON.parse(savedResults);
+        if (parsedResults.graph) {
+          setGraphData(parsedResults.graph);
+          setSource("localStorage");
+          calculateStats(parsedResults.graph);
+        }
+      } else if (!forceNeo4j) {
+        // Try API endpoint as last resort
+        const response = await fetch("/api/graph");
+        const result = await response.json();
         
-        // Calculate stats
-        const uniqueTypes = new Set(result.data.nodes?.map((n: any) => n.type));
-        setStats({
-          nodes: result.data.nodes?.length || 0,
-          edges: result.data.edges?.length || 0,
-          entityTypes: uniqueTypes.size,
-        });
+        if (result.success && result.data) {
+          setGraphData(result.data);
+          calculateStats(result.data);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch graph data:", error);
+      toast.error("Failed to load graph data");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const calculateStats = (data: any) => {
+    const uniqueTypes = new Set(data.nodes?.map((n: any) => n.type));
+    setStats({
+      nodes: data.nodes?.length || 0,
+      edges: data.edges?.length || 0,
+      entityTypes: uniqueTypes.size,
+    });
+  };
+
+  const handleRefreshFromNeo4j = () => {
+    setRefreshing(true);
+    fetchGraphData(true);
   };
 
   const handleExport = () => {
@@ -88,16 +123,33 @@ export default function GraphPage() {
               Back to Home
             </Button>
           </Link>
-          <Button onClick={handleExport} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Graph
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/settings">
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+            </Link>
+            <Button onClick={handleRefreshFromNeo4j} variant="outline" disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              Load from Neo4j
+            </Button>
+            <Button onClick={handleExport} variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
         </div>
 
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">
-            Knowledge Graph Visualization
-          </h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-bold text-slate-900 dark:text-white">
+              Knowledge Graph Visualization
+            </h1>
+            <Badge variant={source === "neo4j" ? "default" : "secondary"}>
+              {source === "neo4j" ? "Neo4j" : "Local Storage"}
+            </Badge>
+          </div>
           <p className="text-slate-600 dark:text-slate-400">
             Interactive visualization of extracted threat intelligence entities and relationships
           </p>
@@ -132,19 +184,8 @@ export default function GraphPage() {
               <div>
                 <CardTitle>Interactive Graph</CardTitle>
                 <CardDescription>
-                  Drag nodes to explore relationships. Click on nodes for details.
+                  Hover over nodes and edges to see details. The graph uses AI-extracted relationships.
                 </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm">
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </CardHeader>
@@ -158,7 +199,7 @@ export default function GraphPage() {
                   </div>
                 </div>
               ) : graphData?.nodes && graphData?.edges ? (
-                <D3GraphVisualization 
+                <ForceGraphVisualization 
                   nodes={graphData.nodes} 
                   links={graphData.edges}
                   width={1200}
@@ -183,14 +224,15 @@ export default function GraphPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              <Badge className="bg-red-500">Malware</Badge>
-              <Badge className="bg-orange-500">Threat Actor</Badge>
+              <Badge className="bg-red-500">Threat Actor</Badge>
+              <Badge className="bg-orange-500">Malware</Badge>
               <Badge className="bg-yellow-500">Tool</Badge>
               <Badge className="bg-green-500">Vulnerability</Badge>
               <Badge className="bg-blue-500">Indicator</Badge>
               <Badge className="bg-purple-500">Campaign</Badge>
-              <Badge className="bg-pink-500">Tactic</Badge>
+              <Badge className="bg-pink-500">Technique</Badge>
               <Badge className="bg-cyan-500">Location</Badge>
+              <Badge className="bg-violet-500">Organization</Badge>
             </div>
           </CardContent>
         </Card>

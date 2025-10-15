@@ -4,13 +4,25 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Network, BarChart3, FileText, Shield, Zap, Brain, Database } from "lucide-react";
+import { Upload, Network, BarChart3, FileText, Shield, Zap, Brain, Database, Settings } from "lucide-react";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      {/* Navigation Header */}
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex justify-end">
+          <Link href="/settings">
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              Configure Neo4j & API Keys
+            </Button>
+          </Link>
+        </div>
+      </div>
+
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 py-12">
         <div className="text-center max-w-4xl mx-auto mb-16">
           <Badge className="mb-4 bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
             Production-Ready Framework

@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { useRouter } from "next/navigation";
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
+import { toast } from "sonner";
 
 // Configure PDF.js worker with multiple fallback strategies
 if (typeof window !== "undefined") {
@@ -120,29 +121,33 @@ export default function UploadPage() {
   };
 
   const handleProcess = async () => {
-    if (!text.trim()) {
-      setError("Please enter CTI text to process");
+    if (!extractedText) {
+      toast.error("Please upload a file first");
       return;
     }
 
-    setIsProcessing(true);
-    setError(null);
-    setResults(null);
-    setProgress(0);
-
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => Math.min(prev + 10, 90));
-    }, 200);
-
+    setProcessing(true);
     try {
-      // Use local Next.js API route instead of FastAPI backend
+      // Get saved configuration
+      const savedConfig = localStorage.getItem("cygraph-config");
+      const config = savedConfig ? JSON.parse(savedConfig) : {};
+
       const response = await fetch("/api/process-cti", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          text: extractedText,
+          config: {
+            neo4j: config.neo4jUri ? {
+              uri: config.neo4jUri,
+              username: config.neo4jUsername,
+              password: config.neo4jPassword,
+            } : undefined,
+            openai: config.openaiApiKey || undefined,
+          },
+        }),
       });
 
       if (!response.ok) {

@@ -1,71 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
+import { neo4jService } from "@/lib/services/neo4j-service";
 
-// This API route proxies Neo4j queries
-// In production, this would use the neo4j-driver package
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { query, parameters } = await request.json();
-
-    if (!query || typeof query !== "string") {
+    // Get Neo4j config from headers
+    const configHeader = request.headers.get("x-neo4j-config");
+    if (!configHeader) {
       return NextResponse.json(
-        { error: "Invalid query: query string is required" },
+        { success: false, error: "Neo4j configuration not provided" },
         { status: 400 }
       );
     }
 
-    // Mock Neo4j driver connection
-    // In production:
-    // const driver = neo4j.driver(uri, neo4j.auth.basic(user, password))
-    // const session = driver.session()
-    // const result = await session.run(query, parameters)
-    // await session.close()
+    const config = JSON.parse(configHeader);
+    
+    // Connect to Neo4j
+    neo4jService.connect(config);
 
-    // Mock response based on query type
-    let mockData: any[] = [];
+    // Query the graph
+    const result = await neo4jService.queryGraph();
 
-    if (query.includes("MATCH (n")) {
-      // Return mock nodes
-      mockData = [
-        {
-          n: {
-            identity: "1",
-            labels: ["ThreatActor"],
-            properties: { name: "APT28", origin: "Russia", active: true },
-          },
-        },
-        {
-          n: {
-            identity: "2",
-            labels: ["Malware"],
-            properties: { name: "Zebrocy", family: "Trojan", first_seen: "2015" },
-          },
-        },
-      ];
-    } else if (query.includes("CREATE")) {
-      // Return created node
-      mockData = [
-        {
-          n: {
-            identity: Date.now().toString(),
-            labels: ["Entity"],
-            properties: parameters?.props || {},
-          },
-        },
-      ];
-    }
+    // Transform to frontend format
+    const graphData = {
+      nodes: result.nodes.map((node) => ({
+        id: node.id,
+        label: node.properties.text || node.properties.name || node.id,
+        type: node.properties.type || "unknown",
+        confidence: node.properties.confidence || 1,
+      })),
+      edges: result.relationships.map((rel) => ({
+        id: rel.id,
+        source: rel.startNode,
+        target: rel.endNode,
+        label: rel.properties.type || rel.type,
+        confidence: rel.properties.confidence || 1,
+      })),
+    };
+
+    await neo4jService.close();
 
     return NextResponse.json({
       success: true,
-      data: mockData,
+      data: graphData,
       metadata: {
-        query_time: Math.random() * 100,
-        records_affected: mockData.length,
+        total_nodes: graphData.nodes.length,
+        total_edges: graphData.edges.length,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Neo4j query error:", error);
     return NextResponse.json(
-      { error: "Database query failed" },
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { query, params, config } = body;
+
+    if (!config) {
+      return NextResponse.json(
+        { success: false, error: "Neo4j configuration not provided" },
+        { status: 400 }
+      );
+    }
+
+    // Connect to Neo4j
+    neo4jService.connect(config);
+
+    // Execute custom Cypher query
+    const result = await neo4jService.executeCypher(query, params);
+
+    await neo4jService.close();
+
+    return NextResponse.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Neo4j query error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message },
       { status: 500 }
     );
   }
