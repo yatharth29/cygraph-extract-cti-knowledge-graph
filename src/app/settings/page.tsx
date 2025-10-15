@@ -14,7 +14,7 @@ export default function SettingsPage() {
     neo4jUri: "",
     neo4jUsername: "",
     neo4jPassword: "",
-    openaiApiKey: "",
+    geminiApiKey: "",
   });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -164,36 +164,36 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* OpenAI Configuration */}
+          {/* Gemini Configuration */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Key className="h-5 w-5 text-green-600" />
-                <CardTitle>OpenAI API</CardTitle>
+                <CardTitle>Google Gemini API</CardTitle>
               </div>
               <CardDescription>
-                API key for AI-powered relation extraction using GPT models
+                API key for AI-powered relation extraction using Gemini models
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="openai-key">API Key</Label>
+                <Label htmlFor="gemini-key">API Key</Label>
                 <Input
-                  id="openai-key"
+                  id="gemini-key"
                   type="password"
-                  placeholder="sk-..."
-                  value={config.openaiApiKey}
-                  onChange={(e) => setConfig({ ...config, openaiApiKey: e.target.value })}
+                  placeholder="AIza..."
+                  value={config.geminiApiKey}
+                  onChange={(e) => setConfig({ ...config, geminiApiKey: e.target.value })}
                 />
                 <p className="text-xs text-slate-500">
                   Get your API key from{" "}
                   <a
-                    href="https://platform.openai.com/api-keys"
+                    href="https://aistudio.google.com/app/apikey"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:underline"
                   >
-                    platform.openai.com
+                    Google AI Studio
                   </a>
                 </p>
               </div>

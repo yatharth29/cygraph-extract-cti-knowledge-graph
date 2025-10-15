@@ -121,12 +121,20 @@ export default function UploadPage() {
   };
 
   const handleProcess = async () => {
-    if (!extractedText) {
-      toast.error("Please upload a file first");
+    if (!text) {
+      toast.error("Please enter or upload CTI text first");
       return;
     }
 
-    setProcessing(true);
+    setIsProcessing(true);
+    setProgress(0);
+    setError(null);
+    
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => Math.min(prev + 10, 90));
+    }, 500);
+
     try {
       // Get saved configuration
       const savedConfig = localStorage.getItem("cygraph-config");
@@ -138,14 +146,14 @@ export default function UploadPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          text: extractedText,
+          text: text,
           config: {
             neo4j: config.neo4jUri ? {
               uri: config.neo4jUri,
               username: config.neo4jUsername,
               password: config.neo4jPassword,
             } : undefined,
-            openai: config.openaiApiKey || undefined,
+            gemini: config.geminiApiKey || undefined,
           },
         }),
       });
@@ -163,9 +171,11 @@ export default function UploadPage() {
       localStorage.setItem("cti-results", JSON.stringify(data));
       
       setResults(data);
+      toast.success("CTI text processed successfully!");
     } catch (err) {
       clearInterval(progressInterval);
       setError(err instanceof Error ? err.message : "Failed to process CTI text");
+      toast.error("Failed to process CTI text");
     } finally {
       setIsProcessing(false);
     }

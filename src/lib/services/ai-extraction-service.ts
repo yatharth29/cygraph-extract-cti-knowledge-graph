@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export interface ExtractedTriple {
   entity1: string;
@@ -18,32 +18,29 @@ export interface AIExtractionResult {
 }
 
 class AIExtractionService {
-  private openai: OpenAI | null = null;
+  private genAI: GoogleGenerativeAI | null = null;
 
   /**
-   * Initialize OpenAI client
+   * Initialize Gemini client
    */
   initialize(apiKey: string): void {
-    this.openai = new OpenAI({ apiKey });
+    this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
   /**
-   * Extract semantic triples using GPT-4
+   * Extract semantic triples using Gemini
    */
   async extractTriples(text: string): Promise<AIExtractionResult> {
-    if (!this.openai) {
-      throw new Error("OpenAI client not initialized");
+    if (!this.genAI) {
+      throw new Error("Gemini client not initialized");
     }
 
     const startTime = Date.now();
 
     try {
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a cybersecurity threat intelligence analyst. Extract entity-relation-entity triples from CTI text.
+      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const prompt = `You are a cybersecurity threat intelligence analyst. Extract entity-relation-entity triples from CTI text.
 
 For each triple, identify:
 1. entity1: First entity (threat actor, malware, vulnerability, tool, etc.)
@@ -53,31 +50,40 @@ For each triple, identify:
 5. entity2_type: Type of second entity
 6. confidence: Confidence score 0-1
 
-Return JSON array of triples. Extract ALL possible relationships, not just obvious ones.
+Return ONLY a valid JSON object with a "triples" array. Extract ALL possible relationships, not just obvious ones.
 
 Example output:
-[
-  {
-    "entity1": "APT28",
-    "entity1_type": "threat-actor",
-    "relation": "uses",
-    "entity2": "Zebrocy",
-    "entity2_type": "malware",
-    "confidence": 0.95
-  }
-]`,
-          },
-          {
-            role: "user",
-            content: `Extract all entity-relation-entity triples from this CTI text:\n\n${text}`,
-          },
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-      });
+{
+  "triples": [
+    {
+      "entity1": "APT28",
+      "entity1_type": "threat-actor",
+      "relation": "uses",
+      "entity2": "Zebrocy",
+      "entity2_type": "malware",
+      "confidence": 0.95
+    }
+  ]
+}
 
-      const responseContent = completion.choices[0]?.message?.content || "{}";
-      const parsed = JSON.parse(responseContent);
+CTI Text:
+${text}
+
+Return only valid JSON, no additional text:`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+      
+      // Extract JSON from response (handle markdown code blocks)
+      let jsonText = responseText.trim();
+      if (jsonText.startsWith("```json")) {
+        jsonText = jsonText.replace(/^```json\n/, "").replace(/\n```$/, "");
+      } else if (jsonText.startsWith("```")) {
+        jsonText = jsonText.replace(/^```\n/, "").replace(/\n```$/, "");
+      }
+      
+      const parsed = JSON.parse(jsonText);
       const triples = parsed.triples || parsed.results || [];
 
       const processingTime = Date.now() - startTime;
@@ -85,7 +91,7 @@ Example output:
       return {
         triples: this.validateTriples(triples),
         metadata: {
-          model: "gpt-4o-mini",
+          model: "gemini-1.5-flash",
           processingTime,
         },
       };

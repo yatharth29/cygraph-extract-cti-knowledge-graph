@@ -16,16 +16,16 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    // Get configuration (Neo4j + OpenAI)
+    // Get configuration (Neo4j + Gemini)
     const neo4jConfig = config?.neo4j;
-    const openaiKey = config?.openai;
+    const geminiKey = config?.gemini;
 
     // Step 1: Extract triples using AI or fallback to pattern-based
     let extractionResult;
     
-    if (openaiKey) {
+    if (geminiKey) {
       try {
-        aiExtractionService.initialize(openaiKey);
+        aiExtractionService.initialize(geminiKey);
         extractionResult = await aiExtractionService.extractTriples(text);
       } catch (error) {
         console.warn("AI extraction failed, falling back to pattern-based:", error);
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         total_entities: entities.length,
         total_relations: relations.length,
         neo4j_stored: neo4jStored,
-        extraction_method: openaiKey ? "ai" : "pattern-based",
+        extraction_method: geminiKey ? "ai" : "pattern-based",
       },
     });
   } catch (error: any) {
