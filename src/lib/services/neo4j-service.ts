@@ -28,14 +28,26 @@ class Neo4jService {
    */
   connect(config: Neo4jConfig): void {
     try {
-      this.driver = neo4j.driver(
-        config.uri,
-        neo4j.auth.basic(config.username, config.password),
-        {
-          encrypted: "ENCRYPTION_ON",
-          trust: "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES",
-        }
-      );
+      // Check if URI already includes encryption scheme
+      const hasEncryption = config.uri.startsWith("neo4j+s://") || config.uri.startsWith("neo4j+ssc://");
+      
+      if (hasEncryption) {
+        // URI has encryption, don't set it in config
+        this.driver = neo4j.driver(
+          config.uri,
+          neo4j.auth.basic(config.username, config.password)
+        );
+      } else {
+        // No encryption in URI, set it in config
+        this.driver = neo4j.driver(
+          config.uri,
+          neo4j.auth.basic(config.username, config.password),
+          {
+            encrypted: "ENCRYPTION_ON",
+            trust: "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES",
+          }
+        );
+      }
     } catch (error) {
       console.error("Failed to connect to Neo4j:", error);
       throw error;
@@ -58,14 +70,24 @@ class Neo4jService {
   async testConnection(config: Neo4jConfig): Promise<{ success: boolean; version?: string; error?: string }> {
     let tempDriver: Driver | null = null;
     try {
-      tempDriver = neo4j.driver(
-        config.uri,
-        neo4j.auth.basic(config.username, config.password),
-        {
-          encrypted: "ENCRYPTION_ON",
-          trust: "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES",
-        }
-      );
+      // Check if URI already includes encryption scheme
+      const hasEncryption = config.uri.startsWith("neo4j+s://") || config.uri.startsWith("neo4j+ssc://");
+      
+      if (hasEncryption) {
+        tempDriver = neo4j.driver(
+          config.uri,
+          neo4j.auth.basic(config.username, config.password)
+        );
+      } else {
+        tempDriver = neo4j.driver(
+          config.uri,
+          neo4j.auth.basic(config.username, config.password),
+          {
+            encrypted: "ENCRYPTION_ON",
+            trust: "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES",
+          }
+        );
+      }
 
       const session = tempDriver.session();
       const result = await session.run("CALL dbms.components() YIELD versions RETURN versions[0] as version");
