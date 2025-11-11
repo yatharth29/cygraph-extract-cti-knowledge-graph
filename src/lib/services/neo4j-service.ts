@@ -4,6 +4,7 @@ export interface Neo4jConfig {
   uri: string;
   username: string;
   password: string;
+  database?: string;
 }
 
 export interface Neo4jNode {
@@ -28,26 +29,15 @@ class Neo4jService {
    */
   connect(config: Neo4jConfig): void {
     try {
-      // Check if URI already includes encryption scheme
-      const hasEncryption = config.uri.startsWith("neo4j+s://") || config.uri.startsWith("neo4j+ssc://");
-      
-      if (hasEncryption) {
-        // URI has encryption, don't set it in config
-        this.driver = neo4j.driver(
-          config.uri,
-          neo4j.auth.basic(config.username, config.password)
-        );
-      } else {
-        // No encryption in URI, set it in config
-        this.driver = neo4j.driver(
-          config.uri,
-          neo4j.auth.basic(config.username, config.password),
-          {
-            encrypted: "ENCRYPTION_ON",
-            trust: "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES",
-          }
-        );
-      }
+      // For Neo4j Aura (neo4j+s://), use simple connection without extra config
+      this.driver = neo4j.driver(
+        config.uri,
+        neo4j.auth.basic(config.username, config.password),
+        {
+          maxConnectionPoolSize: 50,
+          connectionAcquisitionTimeout: 60000,
+        }
+      );
     } catch (error) {
       console.error("Failed to connect to Neo4j:", error);
       throw error;
@@ -69,35 +59,44 @@ class Neo4jService {
    */
   async testConnection(config: Neo4jConfig): Promise<{ success: boolean; version?: string; error?: string }> {
     let tempDriver: Driver | null = null;
+    let session: Session | null = null;
     try {
-      // Check if URI already includes encryption scheme
-      const hasEncryption = config.uri.startsWith("neo4j+s://") || config.uri.startsWith("neo4j+ssc://");
-      
-      if (hasEncryption) {
-        tempDriver = neo4j.driver(
-          config.uri,
-          neo4j.auth.basic(config.username, config.password)
-        );
-      } else {
-        tempDriver = neo4j.driver(
-          config.uri,
-          neo4j.auth.basic(config.username, config.password),
-          {
-            encrypted: "ENCRYPTION_ON",
-            trust: "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES",
-          }
-        );
-      }
+      // Create driver for Neo4j Aura
+      tempDriver = neo4j.driver(
+        config.uri,
+        neo4j.auth.basic(config.username, config.password),
+        {
+          maxConnectionPoolSize: 50,
+          connectionAcquisitionTimeout: 60000,
+        }
+      );
 
-      const session = tempDriver.session();
-      const result = await session.run("CALL dbms.components() YIELD versions RETURN versions[0] as version");
-      const version = result.records[0]?.get("version") || "Unknown";
-      await session.close();
+      // Verify connectivity
+      await tempDriver.verifyConnectivity();
+
+      // Get version using default database
+      session = tempDriver.session({ database: config.database || "neo4j" });
+      const result = await session.run("RETURN 'Connection successful' as status");
       
-      return { success: true, version };
+      // Try to get version
+      try {
+        const versionResult = await session.run("CALL dbms.components() YIELD versions RETURN versions[0] as version");
+        const version = versionResult.records[0]?.get("version") || "Connected";
+        return { success: true, version };
+      } catch {
+        // If version query fails, just return success
+        return { success: true, version: "Connected" };
+      }
     } catch (error: any) {
-      return { success: false, error: error.message };
+      console.error("Neo4j connection error:", error);
+      return { 
+        success: false, 
+        error: error.message || "Connection failed" 
+      };
     } finally {
+      if (session) {
+        await session.close();
+      }
       if (tempDriver) {
         await tempDriver.close();
       }
@@ -116,7 +115,7 @@ class Neo4jService {
   }): Promise<void> {
     if (!this.driver) throw new Error("Neo4j driver not initialized");
 
-    const session = this.driver.session();
+    const session = this.driver.session({ database: "neo4j" });
     try {
       await session.run(
         `
@@ -151,7 +150,7 @@ class Neo4jService {
   }): Promise<void> {
     if (!this.driver) throw new Error("Neo4j driver not initialized");
 
-    const session = this.driver.session();
+    const session = this.driver.session({ database: "neo4j" });
     try {
       await session.run(
         `
@@ -182,7 +181,7 @@ class Neo4jService {
   }> {
     if (!this.driver) throw new Error("Neo4j driver not initialized");
 
-    const session = this.driver.session();
+    const session = this.driver.session({ database: "neo4j" });
     try {
       const query = cypherQuery || `
         MATCH (n:Entity)
@@ -243,7 +242,7 @@ class Neo4jService {
   async executeCypher(query: string, params?: Record<string, any>): Promise<any[]> {
     if (!this.driver) throw new Error("Neo4j driver not initialized");
 
-    const session = this.driver.session();
+    const session = this.driver.session({ database: "neo4j" });
     try {
       const result = await session.run(query, params || {});
       return result.records.map((record) => record.toObject());
@@ -258,7 +257,7 @@ class Neo4jService {
   async clearGraph(): Promise<void> {
     if (!this.driver) throw new Error("Neo4j driver not initialized");
 
-    const session = this.driver.session();
+    const session = this.driver.session({ database: "neo4j" });
     try {
       await session.run("MATCH (n) DETACH DELETE n");
     } finally {
