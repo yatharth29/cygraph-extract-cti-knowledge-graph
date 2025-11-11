@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState({
-    neo4jUri: "neo4j+s://6ec4c017.databases.neo4j.io",
+    neo4jUri: "neo4j+s://8c50b971.databases.neo4j.io",
     neo4jUsername: "neo4j",
     neo4jPassword: "MsjuTyybxFoDykhhcibz1sPQmoa4eqFXV8zUy5MTEzs",
     geminiApiKey: "AIzaSyDprcLKHVdtRTJLoG_xqx6jFtpwVrFdAvc",
@@ -138,7 +138,7 @@ export default function SettingsPage() {
                 <CardTitle>Neo4j Database</CardTitle>
               </div>
               <CardDescription>
-                Connected to your Neo4j Aura instance (6ec4c017)
+                Connected to your Neo4j Aura instance (8c50b971)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -151,7 +151,7 @@ export default function SettingsPage() {
                   onChange={(e) => setConfig({ ...config, neo4jUri: e.target.value })}
                 />
                 <p className="text-xs text-slate-500">
-                  Instance: Free instance (6ec4c017)
+                  Instance: Free instance (8c50b971)
                 </p>
               </div>
 
