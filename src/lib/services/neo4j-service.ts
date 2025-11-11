@@ -187,7 +187,7 @@ class Neo4jService {
         MATCH (n:Entity)
         OPTIONAL MATCH (n)-[r:RELATES]->(m:Entity)
         RETURN n, r, m
-        LIMIT 100
+        LIMIT 200
       `;
 
       const result = await session.run(query, params || {});
@@ -201,25 +201,25 @@ class Neo4jService {
         const r = record.get("r");
         const m = record.get("m");
 
-        if (n && !nodeIds.has(n.identity.toString())) {
+        if (n && !nodeIds.has(n.properties.id)) {
           nodes.push({
             id: n.properties.id || n.identity.toString(),
             labels: n.labels,
             properties: n.properties,
           });
-          nodeIds.add(n.identity.toString());
+          nodeIds.add(n.properties.id);
         }
 
-        if (m && !nodeIds.has(m.identity.toString())) {
+        if (m && !nodeIds.has(m.properties.id)) {
           nodes.push({
             id: m.properties.id || m.identity.toString(),
             labels: m.labels,
             properties: m.properties,
           });
-          nodeIds.add(m.identity.toString());
+          nodeIds.add(m.properties.id);
         }
 
-        if (r) {
+        if (r && n && m) {
           relationships.push({
             id: r.identity.toString(),
             type: r.properties.type || r.type,

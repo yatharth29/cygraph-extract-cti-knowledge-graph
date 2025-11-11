@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, RefreshCw, Settings } from "lucide-react";
+import { ArrowLeft, Download, RefreshCw, Settings, Database } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ export default function GraphPage() {
   const [graphData, setGraphData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [source, setSource] = useState<"localStorage" | "neo4j">("localStorage");
   const [stats, setStats] = useState({
     nodes: 0,
@@ -103,6 +104,32 @@ export default function GraphPage() {
     fetchGraphData(true);
   };
 
+  const handleSeedSampleData = async () => {
+    setSeeding(true);
+    try {
+      const response = await fetch("/api/neo4j/seed", {
+        method: "POST",
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`Sample data seeded! ${result.entities} entities, ${result.relationships} relationships`);
+        // Immediately load the new data
+        setTimeout(() => {
+          handleRefreshFromNeo4j();
+        }, 1000);
+      } else {
+        toast.error(result.error || "Failed to seed sample data");
+      }
+    } catch (error) {
+      console.error("Failed to seed sample data:", error);
+      toast.error("Failed to seed sample data");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const handleExport = () => {
     const dataStr = JSON.stringify(graphData, null, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
@@ -130,6 +157,10 @@ export default function GraphPage() {
                 Settings
               </Button>
             </Link>
+            <Button onClick={handleSeedSampleData} variant="outline" disabled={seeding}>
+              <Database className={`h-4 w-4 mr-2 ${seeding ? "animate-pulse" : ""}`} />
+              {seeding ? "Seeding..." : "Seed Sample Data"}
+            </Button>
             <Button onClick={handleRefreshFromNeo4j} variant="outline" disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
               Load from Neo4j
@@ -184,7 +215,7 @@ export default function GraphPage() {
               <div>
                 <CardTitle>Interactive Graph</CardTitle>
                 <CardDescription>
-                  Hover over nodes and edges to see details. The graph uses AI-extracted relationships.
+                  Hover over nodes and edges to see details. Click "Seed Sample Data" for best CTI graph example.
                 </CardDescription>
               </div>
             </div>
@@ -208,9 +239,15 @@ export default function GraphPage() {
               ) : (
                 <div className="flex flex-col items-center justify-center h-full">
                   <p className="text-slate-500 mb-4">No graph data available</p>
-                  <Link href="/upload">
-                    <Button>Process CTI Text First</Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSeedSampleData} disabled={seeding}>
+                      <Database className="h-4 w-4 mr-2" />
+                      Seed Sample Data
+                    </Button>
+                    <Link href="/upload">
+                      <Button variant="outline">Process CTI Text</Button>
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
