@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, Database, Key, Lock, CheckCircle } from "lucide-react";
+import { ArrowLeft, Save, Database, Key, AlertTriangle, CheckCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState({
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load saved configuration from localStorage (can override defaults)
@@ -36,6 +38,7 @@ export default function SettingsPage() {
 
   const testConnection = async () => {
     setTesting(true);
+    setConnectionError(null);
     try {
       const response = await fetch("/api/neo4j/test", {
         method: "POST",
@@ -51,13 +54,16 @@ export default function SettingsPage() {
       
       if (result.success) {
         setConnected(true);
+        setConnectionError(null);
         toast.success(`Connected successfully! Neo4j version: ${result.version}`);
       } else {
         setConnected(false);
+        setConnectionError(result.error);
         toast.error(`Connection failed: ${result.error}`);
       }
     } catch (error) {
       setConnected(false);
+      setConnectionError("Failed to test connection");
       toast.error("Failed to test connection");
     } finally {
       setTesting(false);
@@ -85,9 +91,11 @@ export default function SettingsPage() {
       
       if (result.success) {
         setConnected(true);
+        setConnectionError(null);
         toast.success("Configuration saved and Neo4j connection verified!");
       } else {
         setConnected(false);
+        setConnectionError(result.error);
         toast.warning("Configuration saved, but couldn't verify Neo4j connection.");
       }
     } catch (error) {
@@ -100,6 +108,8 @@ export default function SettingsPage() {
   const handleTest = async () => {
     await testConnection();
   };
+
+  const isAuthError = connectionError?.includes("unauthorized") || connectionError?.includes("authentication");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -125,11 +135,34 @@ export default function SettingsPage() {
             Configuration Settings
           </h1>
           <p className="text-slate-600 dark:text-slate-400">
-            Pre-configured with your Neo4j Aura and Gemini credentials
+            Configure your Neo4j Aura and Gemini credentials
           </p>
         </div>
 
         <div className="max-w-2xl mx-auto space-y-6">
+          {/* Authentication Error Alert */}
+          {isAuthError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Authentication Failed</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p>
+                  The password doesn't match Neo4j instance <strong>8c50b971</strong>.
+                </p>
+                <div className="space-y-2 text-sm">
+                  <p className="font-semibold">To get the correct password:</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-2">
+                    <li>Go to <a href="https://console.neo4j.io" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">console.neo4j.io <ExternalLink className="h-3 w-3" /></a></li>
+                    <li>Find instance "Free instance" (8c50b971)</li>
+                    <li>Click the ⋮ menu → "Reset password"</li>
+                    <li>Copy the new password and paste it below</li>
+                    <li>Click "Test Connection"</li>
+                  </ol>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Neo4j Configuration */}
           <Card>
             <CardHeader>
@@ -138,7 +171,7 @@ export default function SettingsPage() {
                 <CardTitle>Neo4j Database</CardTitle>
               </div>
               <CardDescription>
-                Connected to your Neo4j Aura instance (8c50b971)
+                Instance 8c50b971 is running with 3 nodes, 2 relationships
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -151,7 +184,7 @@ export default function SettingsPage() {
                   onChange={(e) => setConfig({ ...config, neo4jUri: e.target.value })}
                 />
                 <p className="text-xs text-slate-500">
-                  Instance: Free instance (8c50b971)
+                  Instance: Free instance (8c50b971) · Version: 2025.10
                 </p>
               </div>
 
@@ -170,10 +203,15 @@ export default function SettingsPage() {
                 <Input
                   id="neo4j-password"
                   type="password"
-                  placeholder="Enter your Neo4j password"
+                  placeholder="Enter your Neo4j password for instance 8c50b971"
                   value={config.neo4jPassword}
                   onChange={(e) => setConfig({ ...config, neo4jPassword: e.target.value })}
                 />
+                {isAuthError && (
+                  <p className="text-xs text-destructive">
+                    ⚠️ This password is for a different instance. Please reset the password for 8c50b971.
+                  </p>
+                )}
               </div>
 
               <Button 
@@ -223,22 +261,40 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Security Notice */}
-          <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <CardTitle className="text-green-900 dark:text-green-100">
-                  Production Ready
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-green-800 dark:text-green-200">
-                Your credentials are pre-configured and stored securely. The system is ready for CTI extraction and graph building.
-              </p>
-            </CardContent>
-          </Card>
+          {/* Status Notice */}
+          {connected ? (
+            <Card className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <CardTitle className="text-green-900 dark:text-green-100">
+                    All Systems Ready
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  Your Neo4j database is connected and the system is ready for CTI extraction and graph building.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  <CardTitle className="text-amber-900 dark:text-amber-100">
+                    Neo4j Not Connected
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  The app works without Neo4j (using memory storage), but you'll need to connect for persistent data storage.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Save Button */}
           <Button 
