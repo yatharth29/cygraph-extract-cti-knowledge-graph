@@ -12,9 +12,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState({
-    neo4jUri: "neo4j+s://8c50b971.databases.neo4j.io",
+    neo4jUri: "neo4j+s://cbd6a898.databases.neo4j.io",
     neo4jUsername: "neo4j",
-    neo4jPassword: "MsjuTyybxFoDykhhcibz1sPQmoa4eqFXV8zUy5MTEzs",
+    neo4jPassword: "Dhf-Lc4uNZQpJ8k0l_W61uECGThrhqkiAuozqCmnXOA",
     geminiApiKey: "AIzaSyDprcLKHVdtRTJLoG_xqx6jFtpwVrFdAvc",
   });
   const [saving, setSaving] = useState(false);
@@ -147,13 +147,13 @@ export default function SettingsPage() {
               <AlertTitle>Authentication Failed</AlertTitle>
               <AlertDescription className="space-y-3">
                 <p>
-                  The password doesn't match Neo4j instance <strong>8c50b971</strong>.
+                  The password doesn't match Neo4j instance <strong>cbd6a898</strong>.
                 </p>
                 <div className="space-y-2 text-sm">
                   <p className="font-semibold">To get the correct password:</p>
                   <ol className="list-decimal list-inside space-y-1 ml-2">
                     <li>Go to <a href="https://console.neo4j.io" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">console.neo4j.io <ExternalLink className="h-3 w-3" /></a></li>
-                    <li>Find instance "Free instance" (8c50b971)</li>
+                    <li>Find instance "Instance02" (cbd6a898)</li>
                     <li>Click the ⋮ menu → "Reset password"</li>
                     <li>Copy the new password and paste it below</li>
                     <li>Click "Test Connection"</li>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                 <CardTitle>Neo4j Database</CardTitle>
               </div>
               <CardDescription>
-                Instance 8c50b971 is running with 3 nodes, 2 relationships
+                Instance cbd6a898 (Instance02)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -184,7 +184,7 @@ export default function SettingsPage() {
                   onChange={(e) => setConfig({ ...config, neo4jUri: e.target.value })}
                 />
                 <p className="text-xs text-slate-500">
-                  Instance: Free instance (8c50b971) · Version: 2025.10
+                  Instance: Instance02 (cbd6a898)
                 </p>
               </div>
 
@@ -203,13 +203,13 @@ export default function SettingsPage() {
                 <Input
                   id="neo4j-password"
                   type="password"
-                  placeholder="Enter your Neo4j password for instance 8c50b971"
+                  placeholder="Enter your Neo4j password for instance cbd6a898"
                   value={config.neo4jPassword}
                   onChange={(e) => setConfig({ ...config, neo4jPassword: e.target.value })}
                 />
                 {isAuthError && (
                   <p className="text-xs text-destructive">
-                    ⚠️ This password is for a different instance. Please reset the password for 8c50b971.
+                    ⚠️ This password is for a different instance. Please reset the password for cbd6a898.
                   </p>
                 )}
               </div>
